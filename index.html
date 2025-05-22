@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кофейни Кирова</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=5bf4679c-bab1-47e8-993a-b0b739f0acbe&lang=ru_RU" type="text/javascript"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    #map {
+      width: 100%;
+      flex-grow: 1;
+      position: relative;
+    }
+    
+    .header {
+      padding: 12px 16px;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      border-bottom: 1px solid var(--tg-theme-hint-color, #999999);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .count {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #999999);
+    }
+
+    .search-container {
+      position: relative;
+      flex: 1;
+      max-width: 300px;
+      margin: 0 15px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 30px 8px 12px;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.2));
+      border-radius: 8px;
+      font-size: 14px;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--tg-theme-button-color, #2481cc);
+    }
+
+    .clear-search {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-active .search-input {
+      background-color: rgba(36, 129, 204, 0.05);
+    }
+
+    .search-highlight {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+    
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+    }
+    
+    .error {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #ff3b30;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .success {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      max-width: 90%;
+      text-align: center;
+    }
+    
+    .nearest {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      padding: 12px;
+      border-radius: 50%;
+      z-index: 1000;
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      border: none;
+      cursor: pointer;
+    }
+    
+    .nearest svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+    
+    .info-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      padding: 12px 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      display: none;
+    }
+    
+    .info-panel.visible {
+      display: block;
+    }
+    
+    .info-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .info-address {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      margin-bottom: 4px;
+    }
+    
+    .info-hours {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      margin-bottom: 8px;
+    }
+    
+    .info-distance {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    
+    .info-button {
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .info-button svg {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Pre-order form styles */
+    #preorderOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .preorder-form {
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 350px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      position: relative;
+    }
+    
+    .preorder-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1));
+      position: sticky;
+      top: 0;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .preorder-title-container {
+      flex: 1;
+    }
+    
+    .preorder-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .preorder-subtitle {
+      font-size: 13px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+    }
+    
+    #closeButton {
+      background: none;
+      border: none;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      font-size: 24px;
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin-left: 10px;
+    }
+    
+    .preorder-content {
+      padding: 12px;
+    }
+    
+    .menu-section {
+      margin-bottom: 20px;
+    }
+    
+    .menu-section-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .menu-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    
+    .menu-item {
+      border: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1));
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .menu-item.selected {
+      border-color: var(--tg-theme-button-color, #2481cc);
+      background-color: rgba(36, 129, 204, 0.05);
+    }
+    
+    .menu-item-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+    
+    .menu-item-price {
+      font-size: 13px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+    }
+    
+    .form-group {
+      margin-bottom: 14px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1));
+      border-radius: 8px;
+      font-size: 14px;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: var(--tg-theme-button-color, #2481cc);
+    }
+    
+    .form-select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1));
+      border-radius: 8px;
+      font-size: 14px;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+    }
+    
+    .form-select:focus {
+      outline: none;
+      border-color: var(--tg-theme-button-color, #2481cc);
+    }
+    
+    .form-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--tg-theme-hint-color, rgba(0, 0, 0, 0.1));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      bottom: 0;
+      background-color: var(--tg-theme-bg-color, #ffffff);
+    }
+    
+    .total-price {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    
+    .submit-button {
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .submit-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .order-success {
+      text-align: center;
+      padding: 24px 16px;
+    }
+    
+    .success-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 14px;
+      background-color: #34c759;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .success-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: white;
+    }
+    
+    .success-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .success-message {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      margin-bottom: 20px;
+    }
+    
+    .success-button {
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    /* Custom balloon content */
+    .custom-balloon {
+      padding: 12px;
+      max-width: 250px;
+    }
+    
+    .balloon-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .balloon-address {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      margin-bottom: 8px;
+    }
+    
+    .balloon-hours {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #8e8e93);
+      margin-bottom: 8px;
+    }
+    
+    .balloon-distance {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: var(--tg-theme-text-color, #000000);
+    }
+    
+    .balloon-button {
+      background-color: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .balloon-button svg {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+    }
+    
+    .close-button-container {
+      text-align: center;
+      margin-top: 16px;
+    }
+    
+    .close-button {
+      background-color: #ff3b30;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+/* Стили для кнопки отслеживания местоположения */
+.tracking-toggle {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background-color: var(--tg-theme-button-color, #2481cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  padding: 12px;
+  border-radius: 50%;
+  z-index: 1000;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: none;
+  cursor: pointer;
+}
+
+.tracking-toggle.active {
+  background-color: #34c759;
+}
+
+.tracking-toggle.active::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background-color: rgba(52, 199, 89, 0.6);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+.tracking-toggle svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.location-accuracy {
+  position: absolute;
+  bottom: 85px;
+  left: 20px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  z-index: 999;
+  display: none;
+}
+
+.location-accuracy.visible {
+  display: block;
+}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="title">Кофейни Кирова</div>
+      <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Поиск кофейни..." />
+        <button id="clearSearch" class="clear-search hidden">&times;</button>
+      </div>
+      <div class="count" id="count">0 найдено</div>
+    </div>
+    <div id="map">
+      <div class="loading hidden" id="loading">Загрузка карты...</div>
+      <div class="error hidden" id="error"></div>
+      <button class="nearest hidden" id="nearest" title="Найти ближайшую кофейню">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+        </svg>
+      </button>
+      <button class="tracking-toggle" id="trackingToggle" title="Отслеживать местоположение" onclick="toggleLocationTracking()">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+        </svg>
+      </button>
+      <div class="location-accuracy" id="locationAccuracy"></div>
+      <div class="info-panel" id="infoPanel">
+        <div class="info-title" id="infoTitle"></div>
+        <div class="info-address" id="infoAddress"></div>
+        <div class="info-hours" id="infoHours"></div>
+        <div class="info-distance" id="infoDistance"></div>
+        <button class="info-button" id="infoButton" onclick="openPreorderFormFromInfo()">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/>
+          </svg>
+          Предзаказ
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pre-order form (hidden by default) -->
+  <div id="preorderOverlay" class="hidden">
+    <div class="preorder-form">
+      <div class="preorder-header">
+        <div class="preorder-title-container">
+          <div class="preorder-title" id="preorderTitle">Предзаказ кофе</div>
+          <div class="preorder-subtitle" id="preorderSubtitle"></div>
+        </div>
+        <button id="closeButton" onclick="hideOverlay()">&times;</button>
+      </div>
+      <div class="preorder-content" id="preorderContent">
+        <div class="menu-section">
+          <div class="menu-section-title">Выберите напиток</div>
+          <div class="menu-items" id="coffeeItems">
+            <div class="menu-item" data-id="americano" data-price="150" onclick="selectCoffee(this)">
+              <div class="menu-item-title">Американо</div>
+              <div class="menu-item-price">150 ₽</div>
+            </div>
+            <div class="menu-item" data-id="cappuccino" data-price="180" onclick="selectCoffee(this)">
+              <div class="menu-item-title">Капучино</div>
+              <div class="menu-item-price">180 ₽</div>
+            </div>
+            <div class="menu-item" data-id="latte" data-price="200" onclick="selectCoffee(this)">
+              <div class="menu-item-title">Латте</div>
+              <div class="menu-item-price">200 ₽</div>
+            </div>
+            <div class="menu-item" data-id="espresso" data-price="120" onclick="selectCoffee(this)">
+              <div class="menu-item-title">Эспрессо</div>
+              <div class="menu-item-price">120 ₽</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="menu-section">
+          <div class="menu-section-title">Дополнительно</div>
+          <div class="menu-items" id="extraItems">
+            <div class="menu-item" data-id="syrup" data-price="30" onclick="toggleExtra(this)">
+              <div class="menu-item-title">Сироп</div>
+              <div class="menu-item-price">30 ₽</div>
+            </div>
+            <div class="menu-item" data-id="cream" data-price="40" onclick="toggleExtra(this)">
+              <div class="menu-item-title">Сливки</div>
+              <div class="menu-item-price">40 ₽</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="size">Размер</label>
+          <select class="form-select" id="size" onchange="updateTotalPrice()">
+            <option value="small">Маленький (200 мл)</option>
+            <option value="medium" selected>Средний (300 мл)</option>
+            <option value="large">Большой (400 мл)</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="comment">Комментарий к заказу</label>
+          <input type="text" class="form-input" id="comment" placeholder="Например: без сахара">
+        </div>
+        
+        <div class="form-footer">
+          <div class="total-price" id="totalPrice">Итого: 0 ₽</div>
+          <button class="submit-button" id="submitOrder" onclick="submitOrder()" disabled>Заказать</button>
+        </div>
+        
+        <div class="close-button-container">
+          <button class="close-button" onclick="hideOverlay()">Закрыть окно</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Initialize Telegram Mini App
+    let tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.expand();
+      tg.ready();
+    }
+    
+    // Cafe data from your provided list
+    const cafes = [
+      {
+        name: "Simply Coffee",
+        address: "ул. Карла Маркса, 127/3, Киров",
+        coords: [58.591360, 49.668697],
+        hours: "Ежедневно 08:00–21:00"
+      },
+      {
+        name: "Лампа Грина",
+        address: "ул. Московская, 3, Киров",
+        coords: [58.604035, 49.683965],
+        hours: "Ежедневно 07:00–22:00"
+      },
+      {
+        name: "Bomarshe",
+        address: "ул. Преображенская, 29, Киров",
+        coords: [58.605530, 49.675189],
+        hours: "Ежедневно 08:00–21:00"
+      },
+      {
+        name: "Лампа Грина",
+        address: "пр. Ленина, 54, Киров",
+        coords: [58.609031, 49.680772],
+        hours: "Ежедневно 07:00–21:00"
+      },
+      {
+        name: "Лампа Грина",
+        address: "пр. Октябрьский, 139, Киров",
+        coords: [58.593329, 49.657418],
+        hours: "Ежедневно 07:00–21:00"
+      },
+      {
+        name: "Зерно",
+        address: "ул. Карла Маркса, 80, Киров",
+        coords: [58.600682, 49.668539],
+        hours: "Ежедневно 08:00–20:00"
+      },
+      {
+        name: "Gussi Coffee",
+        address: "ул. Дмитрия Козулева, 2, Киров",
+        coords: [58.579781, 49.559036],
+        hours: "Ежедневно 08:00–20:00"
+      },
+      {
+        name: "Шоколадница",
+        address: "ул. Спасская, 18а, Киров",
+        coords: [58.601850, 49.674333],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Чизкеечная",
+        address: "ул. Розы Люксембург, 17а, Киров",
+        coords: [58.612096, 49.679020],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Coffee Like",
+        address: "пр. Октябрьский, 117, Киров",
+        coords: [58.604365, 49.656841],
+        hours: "Ежедневно 07:45–21:00"
+      },
+      {
+        name: "Printer Coffee",
+        address: "ул. Карла Либкнехта, 74, Киров",
+        coords: [58.604908, 49.665294],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Чизкеечная",
+        address: "ул. Воровского, 55, Киров",
+        coords: [58.594052, 49.665083],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Хачапури Мадлiani",
+        address: "ул. Карла Маркса, 63, Киров",
+        coords: [58.604925, 49.666349],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Больше, чем торт",
+        address: "ул. Московская, 17, Киров",
+        coords: [58.604249, 49.676947],
+        hours: "Ежедневно 09:00–20:00"
+      },
+      {
+        name: "Малевич",
+        address: "ул. Московская, 12, Киров",
+        coords: [58.603325, 49.677010],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Нина",
+        address: "ул. МОПРа, 26г, Киров",
+        coords: [58.610088, 49.682042],
+        hours: "Ежедневно 08:00–19:00"
+      },
+      {
+        name: "Coffee Like",
+        address: "ул. Спасская, 6, Киров",
+        coords: [58.602078, 49.681554],
+        hours: "Ежедневно 08:00–22:00"
+      },
+      {
+        name: "Малевич",
+        address: "ул. Воровского, 43, Киров",
+        coords: [58.594201, 49.665903],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Фракция",
+        address: "ул. Ленина, 86, Киров",
+        coords: [58.601632, 49.681431],
+        hours: "Ежедневно 08:00–22:00"
+      },
+      {
+        name: "Малевич",
+        address: "ул. Луганская, 53/2, Киров",
+        coords: [58.617044, 49.595800],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Кофе & Книги",
+        address: "ул. Герцена, 50, Киров",
+        coords: [58.599696, 49.659832],
+        hours: "Ежедневно 10:00–19:00"
+      },
+      {
+        name: "Люди Говорят",
+        address: "ул. Дерендяева, 25, Киров",
+        coords: [58.588995, 49.659222],
+        hours: "Ежедневно 10:00–19:00"
+      },
+      {
+        name: "Ё кофе",
+        address: "ул. Преображенская, 95, Киров",
+        coords: [58.605234, 49.654056],
+        hours: "Ежедневно 09:00–22:00"
+      },
+      {
+        name: "КофеЛюб",
+        address: "пр. Октябрьский, 143, Киров",
+        coords: [58.592255, 49.657320],
+        hours: "Выходной"
+      },
+      {
+        name: "Люди Говорят",
+        address: "пр. Октябрьский, 104, Киров",
+        coords: [58.588995, 49.659222],
+        hours: "Ежедневно 08:30–19:30"
+      },
+      {
+        name: "Cuprum",
+        address: "ул. Московская, 15, Киров",
+        coords: [58.603915, 49.678552],
+        hours: "Ежедневно 09:00–20:00"
+      },
+      {
+        name: "Baron Chaikha",
+        address: "ул. Розы Люксембург, 30, Киров",
+        coords: [58.611725, 49.678839],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Coffee Like",
+        address: "ул. Московская, 7, Киров",
+        coords: [58.603891, 49.680352],
+        hours: "Ежедневно 07:30–21:00"
+      },
+      {
+        name: "New-York Coffee",
+        address: "ул. Карла Либкнехта, 71, Киров",
+        coords: [58.602872, 49.664424],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Люди Говорят",
+        address: "ул. Карла Маркса, 132, Киров",
+        coords: [58.589117, 49.669884],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Эклерия",
+        address: "ул. Московская, 33а, Киров",
+        coords: [58.603718, 49.670658],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Coffee Like",
+        address: "ул. Краснополянская, 3, Киров",
+        coords: [58.601736, 49.576512],
+        hours: "Ежедневно 07:30–20:30"
+      },
+      {
+        name: "Varim",
+        address: "ул. Калинина, 9, Киров",
+        coords: [58.587781, 49.640959],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Тартин",
+        address: "ул. Орловская, 15, Киров",
+        coords: [58.596409, 49.685252],
+        hours: "Ежедневно 11:00–19:00"
+      },
+      {
+        name: "Полезнямки",
+        address: "ул. Герцена, 64, Киров",
+        coords: [58.599696, 49.659832],
+        hours: "Ежедневно 10:00–19:00"
+      },
+      {
+        name: "RJ Coffee",
+        address: "ул. Капитана Дорофеева, 26, Киров",
+        coords: [58.580658, 49.563199],
+        hours: "Ежедневно 09:00–21:00"
+      },
+      {
+        name: "Redbrick Coffee",
+        address: "ул. Спасская, 38, Киров",
+        coords: [58.601725, 49.665574],
+        hours: "Ежедневно 08:00–21:00"
+      },
+      {
+        name: "Бодрящий поцелуй",
+        address: "ул. Воровского, 43, Киров",
+        coords: [58.594605, 49.667109],
+        hours: "Ежедневно 08:00–20:00"
+      },
+      {
+        name: "Меренга Мания",
+        address: "ул. Дмитрия Козулева, 2, Киров",
+        coords: [58.580089, 49.558787],
+        hours: "Ежедневно 09:00–19:00"
+      },
+      {
+        name: "Панда Чё",
+        address: "ул. Воровского, 50в, Киров",
+        coords: [58.593234, 49.654333],
+        hours: "Ежедневно 08:20–24:00"
+      },
+      {
+        name: "Арт-кофейня",
+        address: "ул. Горького, 5а, Киров",
+        coords: [58.599047, 49.648663],
+        hours: "Ежедневно 10:00–22:00"
+      },
+      {
+        name: "Десертомания",
+        address: "ул. Карла Маркса, 18а, Киров",
+        coords: [58.613851, 49.667326],
+        hours: "Ежедневно 10:00–19:00"
+      },
+      {
+        name: "Bar",
+        address: "ул. Воровского, 135, Киров",
+        coords: [58.598195, 49.606836],
+        hours: "Ежедневно 10:00–21:00"
+      },
+      {
+        name: "Ё кофе",
+        address: "ул. Московская, 133, Киров",
+        coords: [58.603332, 49.622093],
+        hours: "Ежедневно 09:00–20:00"
+      },
+      {
+        name: "Кофейные моменты",
+        address: "ул. Василия Жуковского, 11а, Киров",
+        coords: [58.641668, 49.607986],
+        hours: "Ежедневно 10:00–20:00"
+      }
+    ];
+    
+    // Variables
+    let map;
+    let userLocation = null;
+    let coffeeShops = [];
+    let userPlacemark = null;
+    let userLocationCircle = null;
+    let currentRoute = null;
+    let currentNearestShop = null;
+    let isTrackingLocation = false;
+    let locationWatchId = null;
+    let lastKnownPosition = null;
+    let lastUpdateTime = null;
+    
+    // Pre-order variables
+    let currentShop = null;
+    let selectedCoffee = null;
+    let selectedExtras = [];
+    let totalPrice = 0;
+    
+    // Show error
+    function showError(message, duration = 5000) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+      
+      setTimeout(() => {
+        errorEl.classList.add('hidden');
+      }, duration);
+    }
+
+    // Show success notification
+    function showSuccess(message, duration = 3000) {
+      const successEl = document.createElement('div');
+      successEl.className = 'success';
+      successEl.textContent = message;
+      document.getElementById('map').appendChild(successEl);
+      
+      setTimeout(() => {
+        successEl.remove();
+      }, duration);
+    }
+    
+    // Initialize map when Yandex Maps API is ready
+    ymaps.ready(initMap);
+    
+    async function initMap() {
+      try {
+        // Show loading indicator
+        document.getElementById('loading').textContent = 'Загрузка карты...';
+        document.getElementById('loading').classList.remove('hidden');
+        
+        // Create map centered on Kirov
+        map = new ymaps.Map('map', {
+          center: [58.603, 49.668], // Kirov center
+          zoom: 13,
+          controls: ['zoomControl']
+        });
+        
+        // Get user location
+        await getUserLocation();
+        
+        // Load coffee shops from provided data
+        loadCoffeeShops();
+        
+        // Setup search functionality
+        setupSearch();
+        
+        // Hide loading indicator
+        document.getElementById('loading').classList.add('hidden');
+        
+        // Show nearest button if user location is available
+        if (userLocation) {
+          const nearestBtn = document.getElementById('nearest');
+          nearestBtn.classList.remove('hidden');
+          nearestBtn.onclick = findNearestAndZoomToUser;
+        }
+      } catch (error) {
+        console.error('Map initialization error:', error);
+        document.getElementById('loading').classList.add('hidden');
+        showError('Ошибка при инициализации карты. Попробуйте перезагрузить страницу.');
+      }
+    }
+    
+    // Get user location with high accuracy
+    async function getUserLocation() {
+      try {
+        // Показываем индикатор загрузки
+        document.getElementById('loading').textContent = 'Определение местоположения...';
+        document.getElementById('loading').classList.remove('hidden');
+        
+        // Используем Яндекс.Карты для определения местоположения
+        const result = await ymaps.geolocation.get({
+          provider: 'auto',
+          mapStateAutoApply: false,
+          autoReverseGeocode: false
+        });
+        
+        if (result && result.geoObjects && result.geoObjects.position) {
+          userLocation = result.geoObjects.position;
+          
+          // Удаляем существующий маркер пользователя, если он есть
+          if (userPlacemark) {
+            map.geoObjects.remove(userPlacemark);
+          }
+          
+          // Добавляем маркер пользователя
+          userPlacemark = new ymaps.Placemark(userLocation, {
+            balloonContent: 'Вы здесь'
+          }, {
+            preset: 'islands#geolocationIcon',
+            iconColor: '#3b5998'
+          });
+          
+          map.geoObjects.add(userPlacemark);
+          
+          // Добавляем круг точности
+          if (result.geoObjects.get(0) && result.geoObjects.get(0).properties.get('accuracy')) {
+            const accuracy = result.geoObjects.get(0).properties.get('accuracy');
+            
+            // Удаляем существующий круг, если он есть
+            if (userLocationCircle) {
+              map.geoObjects.remove(userLocationCircle);
+            }
+            
+            // Создаем новый круг точности
+            userLocationCircle = new ymaps.Circle([userLocation, accuracy], {
+              hintContent: `Точность: ${Math.round(accuracy)} м`
+            }, {
+              fillColor: "#68a0fc55",
+              strokeColor: "#3b5998",
+              strokeOpacity: 0.8,
+              strokeWidth: 2
+            });
+            
+            map.geoObjects.add(userLocationCircle);
+            
+            // Показываем точность
+            const accuracyEl = document.getElementById('locationAccuracy');
+            accuracyEl.textContent = `Точность: ${Math.round(accuracy)} м`;
+            accuracyEl.classList.add('visible');
+          }
+          
+          // Центрируем карту
+          map.setCenter(userLocation, 15);
+          
+          // Сохраняем последнюю известную позицию
+          lastKnownPosition = userLocation;
+          lastUpdateTime = new Date();
+          
+          // Скрываем индикатор загрузки
+          document.getElementById('loading').classList.add('hidden');
+          
+          return userLocation;
+        } else {
+          throw new Error('Не удалось определить местоположение');
+        }
+      } catch (error) {
+        console.error('Geolocation error:', error);
+        document.getElementById('loading').classList.add('hidden');
+        showError('Не удалось определить ваше местоположение. Проверьте настройки доступа к геолокации.');
+        throw error;
+      }
+    }
+
+    // Включение/выключение отслеживания местоположения
+    function toggleLocationTracking() {
+      const trackingToggle = document.getElementById('trackingToggle');
+      
+      if (isTrackingLocation) {
+        // Останавливаем отслеживание
+        stopLocationTracking();
+        trackingToggle.classList.remove('active');
+        showSuccess('Отслеживание местоположения выключено');
+      } else {
+        // Запускаем отслеживание
+        startLocationTracking();
+        trackingToggle.classList.add('active');
+        showSuccess('Отслеживание местоположения включено');
+      }
+    }
+
+    // Запуск отслеживания местоположения
+    function startLocationTracking() {
+      if (isTrackingLocation) return;
+      
+      isTrackingLocation = true;
+      
+      // Получаем начальное местоположение
+      getUserLocation().then(() => {
+        // Запускаем таймер для периодического обновления местоположения
+        locationWatchId = setInterval(updateUserLocation, 5000); // Обновляем каждые 5 секунд
+      }).catch(error => {
+        console.error('Error starting location tracking:', error);
+        isTrackingLocation = false;
+        document.getElementById('trackingToggle').classList.remove('active');
+        showError('Не удалось запустить отслеживание местоположения');
+      });
+    }
+
+    // Остановка отслеживания местоположения
+    function stopLocationTracking() {
+      if (!isTrackingLocation) return;
+      
+      isTrackingLocation = false;
+      
+      // Останавливаем таймер
+      if (locationWatchId) {
+        clearInterval(locationWatchId);
+        locationWatchId = null;
+      }
+      
+      // Скрываем индикатор точности
+      document.getElementById('locationAccuracy').classList.remove('visible');
+    }
+
+    // Обновление местоположения пользователя
+    async function updateUserLocation() {
+      if (!isTrackingLocation) return;
+      
+      try {
+        // Используем Яндекс.Карты для определения местоположения
+        const result = await ymaps.geolocation.get({
+          provider: 'auto',
+          mapStateAutoApply: false,
+          autoReverseGeocode: false
+        });
+        
+        if (result && result.geoObjects && result.geoObjects.position) {
+          const newPosition = result.geoObjects.position;
+          
+          // Проверяем, изменилось ли местоположение значительно (более 10 метров)
+          if (lastKnownPosition) {
+            const distance = ymaps.coordSystem.geo.getDistance(lastKnownPosition, newPosition);
+            
+            // Если расстояние меньше 10 метров, не обновляем
+            if (distance < 10) {
+              return;
+            }
+          }
+          
+          // Обновляем местоположение пользователя
+          userLocation = newPosition;
+          
+          // Удаляем существующий маркер пользователя
+          if (userPlacemark) {
+            map.geoObjects.remove(userPlacemark);
+          }
+          
+          // Добавляем новый маркер пользователя
+          userPlacemark = new ymaps.Placemark(userLocation, {
+            balloonContent: 'Вы здесь'
+          }, {
+            preset: 'islands#geolocationIcon',
+            iconColor: '#3b5998'
+          });
+          
+          map.geoObjects.add(userPlacemark);
+          
+          // Обновляем круг точности
+          if (result.geoObjects.get(0) && result.geoObjects.get(0).properties.get('accuracy')) {
+            const accuracy = result.geoObjects.get(0).properties.get('accuracy');
+            
+            // Удаляем существующий круг
+            if (userLocationCircle) {
+              map.geoObjects.remove(userLocationCircle);
+            }
+            
+            // Создаем новый круг точности
+            userLocationCircle = new ymaps.Circle([userLocation, accuracy], {
+              hintContent: `Точность: ${Math.round(accuracy)} м`
+            }, {
+              fillColor: "#68a0fc55",
+              strokeColor: "#3b5998",
+              strokeOpacity: 0.8,
+              strokeWidth: 2
+            });
+            
+            map.geoObjects.add(userLocationCircle);
+            
+            // Показываем точность
+            const accuracyEl = document.getElementById('locationAccuracy');
+            accuracyEl.textContent = `Точность: ${Math.round(accuracy)} м`;
+            accuracyEl.classList.add('visible');
+          }
+          
+          // Если есть активный маршрут, обновляем его
+          if (currentRoute && currentShop) {
+            updateRouteToShop(currentShop);
+          }
+          
+          // Сохраняем последнюю известную позицию и время обновления
+          lastKnownPosition = userLocation;
+          lastUpdateTime = new Date();
+          
+          // Показываем краткое уведомление об обновлении местоположения
+          const timeSinceLastUpdate = Math.round((new Date() - lastUpdateTime) / 1000);
+          if (timeSinceLastUpdate > 10) { // Показываем уведомление только если прошло более 10 секунд с последнего обновления
+            showSuccess('Местоположение обновлено', 1500);
+          }
+        }
+      } catch (error) {
+        console.error('Error updating location:', error);
+      }
+    }
+
+    // Обновление маршрута до кофейни при изменении местоположения пользователя
+    function updateRouteToShop(shop) {
+      // Проверяем, доступно ли местоположение пользователя
+      if (!userLocation) {
+        return;
+      }
+      
+      // Удаляем существующий маршрут
+      if (currentRoute) {
+        map.geoObjects.remove(currentRoute);
+        currentRoute = null;
+      }
+      
+      // Создаем новый маршрут
+      const multiRoute = new ymaps.multiRouter.MultiRoute({
+        referencePoints: [
+          userLocation,
+          shop.coords
+        ],
+        params: {
+          routingMode: 'pedestrian',
+          avoidTrafficJams: false
+        }
+      }, {
+        boundsAutoApply: false,
+        wayPointVisible: false,
+        routeActiveStrokeColor: "#795548",
+        routeActiveStrokeWidth: 4
+      });
+      
+      // Добавляем маршрут на карту
+      map.geoObjects.add(multiRoute);
+      currentRoute = multiRoute;
+      
+      // Пересчитываем расстояние
+      const distance = ymaps.coordSystem.geo.getDistance(userLocation, shop.coords);
+      shop.distance = distance;
+      
+      // Обновляем информацию о расстоянии в инфо-панели, если она открыта
+      const infoPanel = document.getElementById('infoPanel');
+      if (infoPanel.classList.contains('visible')) {
+        document.getElementById('infoDistance').textContent = `Расстояние: ${formatDistance(distance)}`;
+      }
+    }
+    
+    // Format distance
+    function formatDistance(distance) {
+      if (distance < 1000) {
+        return `${Math.round(distance)} м`;
+      } else {
+        return `${(distance / 1000).toFixed(1)} км`;
+      }
+    }
+    
+    // Load coffee shops from provided data
+    function loadCoffeeShops() {
+      coffeeShops = cafes.map(cafe => {
+        // Create placemark
+        const placemark = new ymaps.Placemark(cafe.coords, {
+          hintContent: cafe.name
+        }, {
+          preset: 'islands#brownCoffeeIcon'
+        });
+        
+        // Store cafe data directly in placemark for easy access
+        placemark.cafeData = {
+          name: cafe.name,
+          address: cafe.address,
+          hours: cafe.hours,
+          coords: cafe.coords
+        };
+        
+        // Add click event to placemark
+        placemark.events.add('click', function() {
+          // Calculate distance if user location is available
+          let distance = null;
+          if (userLocation) {
+            distance = ymaps.coordSystem.geo.getDistance(userLocation, cafe.coords);
+            
+            // Build route to this coffee shop
+            showRouteToShop({
+              name: cafe.name,
+              address: cafe.address,
+              hours: cafe.hours,
+              coords: cafe.coords,
+              distance: distance
+            });
+          }
+          
+          // Create balloon content with distance
+          const balloonContent = createBalloonContent(cafe.name, cafe.address, cafe.hours, distance);
+          
+          // Store current shop for pre-order
+          currentShop = {
+            name: cafe.name,
+            address: cafe.address,
+            hours: cafe.hours,
+            coords: cafe.coords
+          };
+          
+          // Force close any open balloon first
+          map.balloon.close();
+          
+          // Then open a new balloon at the placemark's position
+          map.balloon.open(cafe.coords, {
+            content: balloonContent
+          }, {
+            closeButton: true
+          });
+        });
+        
+        map.geoObjects.add(placemark);
+        
+        return {
+          name: cafe.name,
+          address: cafe.address,
+          coords: cafe.coords,
+          hours: cafe.hours,
+          placemark
+        };
+      });
+      
+      // Update count
+      document.getElementById('count').textContent = `${coffeeShops.length} найдено`;
+    }
+
+    // Search functionality
+    function setupSearch() {
+      const searchInput = document.getElementById('searchInput');
+      const clearButton = document.getElementById('clearSearch');
+      
+      // Add event listeners
+      searchInput.addEventListener('input', handleSearch);
+      clearButton.addEventListener('click', clearSearch);
+      
+      function handleSearch() {
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        
+        if (searchTerm.length > 0) {
+          // Show clear button
+          clearButton.classList.remove('hidden');
+          
+          // Filter coffee shops
+          const filteredShops = coffeeShops.filter(shop => {
+            return shop.name.toLowerCase().includes(searchTerm) || 
+                   shop.address.toLowerCase().includes(searchTerm);
+          });
+          
+          // Hide all placemarks first
+          coffeeShops.forEach(shop => {
+            shop.placemark.options.set('visible', false);
+          });
+          
+          // Show matching placemarks and add highlight
+          filteredShops.forEach(shop => {
+            shop.placemark.options.set('visible', true);
+            shop.placemark.options.set('preset', 'islands#redCoffeeIcon');
+          });
+          
+          // Update count
+          document.getElementById('count').textContent = `${filteredShops.length} найдено`;
+          
+          // If only one result, center map on it
+          if (filteredShops.length === 1) {
+            map.setCenter(filteredShops[0].coords, map.getZoom());
+          }
+          
+          // Add search active class to container
+          searchInput.parentElement.classList.add('search-active');
+        } else {
+          clearSearch();
+        }
+      }
+      
+      function clearSearch() {
+        // Clear input
+        searchInput.value = '';
+        
+        // Hide clear button
+        clearButton.classList.add('hidden');
+        
+        // Show all placemarks and restore original icon
+        coffeeShops.forEach(shop => {
+          shop.placemark.options.set('visible', true);
+          shop.placemark.options.set('preset', 'islands#brownCoffeeIcon');
+        });
+        
+        // Update count
+        document.getElementById('count').textContent = `${coffeeShops.length} найдено`;
+        
+        // Remove search active class
+        searchInput.parentElement.classList.remove('search-active');
+      }
+    }
+    
+    // Create custom balloon content with pre-order button and distance
+    function createBalloonContent(name, address, hours, distance) {
+      const distanceHtml = distance ? 
+        `<div class="balloon-distance">Расстояние: ${formatDistance(distance)}</div>` : '';
+      
+      return `
+        <div class="custom-balloon">
+          <div class="balloon-title">${name}</div>
+          <div class="balloon-address">${address}</div>
+          <div class="balloon-hours">${hours}</div>
+          ${distanceHtml}
+          <button class="balloon-button" onclick="openPreorderForm('${name.replace(/'/g, "\\'")}', '${address.replace(/'/g, "\\'")}', '${hours.replace(/'/g, "\\'")}')">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/>
+            </svg>
+            Предзаказ
+          </button>
+        </div>
+      `;
+    }
+    
+    // Find nearest coffee shop and zoom to user location
+    function findNearestAndZoomToUser() {
+      if (!userLocation) {
+        showError('Невозможно определить ваше местоположение');
+        return;
+      }
+      
+      // First zoom to user location
+      map.setCenter(userLocation, 15);
+      
+      // Then find nearest coffee shop
+      findNearest();
+    }
+    
+    // Find nearest coffee shop
+    function findNearest() {
+      if (!userLocation || coffeeShops.length === 0) {
+        showError('Невозможно найти ближайшую кофейню');
+        return;
+      }
+      
+      let nearestShop = null;
+      let minDistance = Infinity;
+      
+      // Calculate distances to all coffee shops
+      coffeeShops.forEach(shop => {
+        const distance = ymaps.coordSystem.geo.getDistance(userLocation, shop.coords);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestShop = shop;
+          nearestShop.distance = distance;
+        }
+      });
+      
+      if (nearestShop) {
+        // Store current nearest shop
+        currentNearestShop = nearestShop;
+        
+        // Show route to the shop
+        showRouteToShop(nearestShop);
+        
+        // Show a brief notification about the nearest shop
+        showSuccess(`Найдена ближайшая кофейня: ${nearestShop.name} (${formatDistance(nearestShop.distance)})`);
+      }
+    }
+    
+    // Show route to coffee shop
+    function showRouteToShop(shop) {
+      // Check if user location is available
+      if (!userLocation) {
+        showError('Невозможно построить маршрут: определите ваше местоположение');
+        return;
+      }
+      
+      // Обновляем маршрут
+      updateRouteToShop(shop);
+      
+      // Store current shop for pre-order
+      currentShop = {
+        name: shop.name,
+        address: shop.address,
+        hours: shop.hours,
+        coords: shop.coords
+      };
+      
+      // Показываем инфо-панель с деталями кофейни
+      showInfoPanel(shop);
+    }
+    
+    // Show info panel with shop details
+    function showInfoPanel(shop) {
+      const infoPanel = document.getElementById('infoPanel');
+      const infoTitle = document.getElementById('infoTitle');
+      const infoAddress = document.getElementById('infoAddress');
+      const infoHours = document.getElementById('infoHours');
+      const infoDistance = document.getElementById('infoDistance');
+      
+      // Set shop details
+      infoTitle.textContent = shop.name;
+      infoAddress.textContent = shop.address;
+      infoHours.textContent = shop.hours;
+      
+      // Format distance
+      if (shop.distance) {
+        infoDistance.textContent = `Расстояние: ${formatDistance(shop.distance)}`;
+      } else {
+        infoDistance.textContent = '';
+      }
+      
+      // Show panel
+      infoPanel.classList.add('visible');
+    }
+    
+    // Open pre-order form from info panel
+    function openPreorderFormFromInfo() {
+      if (currentShop) {
+        openPreorderForm(currentShop.name, currentShop.address, currentShop.hours);
+      }
+    }
+    
+    // Open pre-order form
+    function openPreorderForm(shopName, shopAddress, shopHours) {
+      console.log("Opening pre-order form for:", shopName);
+      
+      // Set current shop
+      currentShop = {
+        name: shopName,
+        address: shopAddress,
+        hours: shopHours
+      };
+      
+      // Reset selections
+      selectedCoffee = null;
+      selectedExtras = [];
+      
+      // Reset UI
+      document.querySelectorAll('#coffeeItems .menu-item').forEach(el => {
+        el.classList.remove('selected');
+      });
+      
+      document.querySelectorAll('#extraItems .menu-item').forEach(el => {
+        el.classList.remove('selected');
+      });
+      
+      document.getElementById('size').value = 'medium';
+      document.getElementById('comment').value = '';
+      
+      // Update form title
+      document.getElementById('preorderTitle').textContent = 'Предзаказ кофе';
+      document.getElementById('preorderSubtitle').textContent = `${shopName} (${shopHours})`;
+      
+      // Update total price
+      updateTotalPrice();
+      
+      // Show form
+      document.getElementById('preorderOverlay').classList.remove('hidden');
+    }
+    
+    // Hide overlay
+    function hideOverlay() {
+      console.log("Hiding overlay");
+      document.getElementById('preorderOverlay').classList.add('hidden');
+    }
+    
+    // Select coffee
+    function selectCoffee(element) {
+      // Deselect all coffee items
+      document.querySelectorAll('#coffeeItems .menu-item').forEach(el => {
+        el.classList.remove('selected');
+      });
+      
+      // Select clicked item
+      element.classList.add('selected');
+      
+      // Update selected coffee
+      selectedCoffee = {
+        id: element.dataset.id,
+        name: element.querySelector('.menu-item-title').textContent,
+        price: parseInt(element.dataset.price)
+      };
+      
+      // Update total price
+      updateTotalPrice();
+    }
+    
+    // Toggle extra
+    function toggleExtra(element) {
+      // Toggle selection
+      element.classList.toggle('selected');
+      
+      // Update selected extras
+      const extraId = element.dataset.id;
+      const extraName = element.querySelector('.menu-item-title').textContent;
+      const extraPrice = parseInt(element.dataset.price);
+      
+      if (element.classList.contains('selected')) {
+        // Add to selected extras
+        selectedExtras.push({
+          id: extraId,
+          name: extraName,
+          price: extraPrice
+        });
+      } else {
+        // Remove from selected extras
+        selectedExtras = selectedExtras.filter(extra => extra.id !== extraId);
+      }
+      
+      // Update total price
+      updateTotalPrice();
+    }
+    
+    // Update total price
+    function updateTotalPrice() {
+      let price = 0;
+      
+      // Add coffee price
+      if (selectedCoffee) {
+        price += selectedCoffee.price;
+      }
+      
+      // Add extras price
+      selectedExtras.forEach(extra => {
+        price += extra.price;
+      });
+      
+      // Add size modifier
+      const size = document.getElementById('size').value;
+      if (size === 'large' && selectedCoffee) {
+        price += 50;
+      } else if (size === 'small' && selectedCoffee) {
+        price -= 20;
+      }
+      
+      // Update total price
+      totalPrice = price;
+      document.getElementById('totalPrice').textContent = `Итого: ${totalPrice} ₽`;
+      
+      // Enable/disable submit button
+      document.getElementById('submitOrder').disabled = !selectedCoffee;
+    }
+    
+    // Submit order
+    function submitOrder() {
+      if (!selectedCoffee) return;
+      
+      // Get form data
+      const size = document.getElementById('size').value;
+      const comment = document.getElementById('comment').value;
+      
+      // Create order object
+      const order = {
+        shop: currentShop,
+        coffee: selectedCoffee,
+        extras: selectedExtras,
+        size,
+        comment,
+        totalPrice,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Order submitted:', order);
+      
+      // Show success message
+      showOrderSuccess(order);
+      
+      // Send data to Telegram Mini App if available
+      if (tg) {
+        // Format order details for Telegram
+        const orderDetails = {
+          shop_name: order.shop.name,
+          shop_address: order.shop.address,
+          shop_hours: order.shop.hours,
+          coffee_name: order.coffee.name,
+          coffee_size: size,
+          extras: order.extras.map(e => e.name).join(', '),
+          comment: comment,
+          total_price: totalPrice,
+          order_id: Math.floor(Math.random() * 1000000)
+        };
+        
+        // Send data back to the bot
+        tg.sendData(JSON.stringify(orderDetails));
+      }
+    }
+    
+    // Show order success message
+    function showOrderSuccess(order) {
+      // Create success message
+      const sizeName = {
+        small: 'Маленький (200 мл)',
+        medium: 'Средний (300 мл)',
+        large: 'Большой (400 мл)'
+      }[order.size];
+      
+      const extrasText = order.extras.length > 0
+        ? `<p>Дополнительно: ${order.extras.map(e => e.name).join(', ')}</p>`
+        : '';
+      
+      const commentText = order.comment
+        ? `<p>Комментарий: ${order.comment}</p>`
+        : '';
+      
+      // Update content
+      document.getElementById('preorderContent').innerHTML = `
+        <div class="order-success">
+          <div class="success-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="success-title">Заказ принят!</div>
+          <div class="success-message">
+            <p>Ваш заказ успешно отправлен в кофейню "${order.shop.name}".</p>
+            <p>Адрес: ${order.shop.address}</p>
+            <p>Время работы: ${order.shop.hours}</p>
+            <p>Напиток: ${order.coffee.name}, ${sizeName}</p>
+            ${extrasText}
+            ${commentText}
+            <p>Сумма заказа: ${order.totalPrice} ₽</p>
+            <p>Время заказа: ${new Date().toLocaleTimeString()}</p>
+          </div>
+          <button class="success-button" onclick="hideOverlay()">Готово</button>
+        </div>
+      `;
+      
+      // Update form title
+      document.getElementById('preorderTitle').textContent = 'Заказ оформлен';
+      document.getElementById('preorderSubtitle').textContent = '';
+    }
+    
+    // Make functions available globally
+    window.openPreorderForm = openPreorderForm;
+    window.openPreorderFormFromInfo = openPreorderFormFromInfo;
+    window.hideOverlay = hideOverlay;
+    window.selectCoffee = selectCoffee;
+    window.toggleExtra = toggleExtra;
+    window.updateTotalPrice = updateTotalPrice;
+    window.submitOrder = submitOrder;
+    window.toggleLocationTracking = toggleLocationTracking;
+  </script>
+</body>
+</html>
